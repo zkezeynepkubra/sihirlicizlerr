@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sihirli Çizgiler</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React ve ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel (JSX'i tarayıcının anlaması için) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden; /* Sayfanın kaymasını engeller */
+      touch-action: none; /* Mobilde dokunmatik kaydırmayı engeller */
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useCallback } = React;
+
+    /**
+     * Sihirli Çizgiler - Bilfen Okulları için Özel Tasarlanmış Eğitim Materyali
+     */
+
+    // --- IKONLAR ---
+    const IconBase = ({ children, size = 24, className = '', fill = 'none', ...props }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+        {children}
+      </svg>
+    );
+
+    const Pencil = (p) => <IconBase {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></IconBase>;
+    const Eraser = (p) => <IconBase {...p}><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></IconBase>;
+    const Brush = (p) => <IconBase {...p}><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></IconBase>;
+    const Trash2 = (p) => <IconBase {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>;
+    const Undo2 = (p) => <IconBase {...p}><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></IconBase>;
+    const Sparkles = (p) => <IconBase {...p}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/></IconBase>;
+    const Wand2 = (p) => <IconBase {...p}><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></IconBase>;
+    const AlertCircle = (p) => <IconBase {...p}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12" y1="16" y2="16.01"/></IconBase>;
+    const HomeIcon = (p) => <IconBase {...p}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></IconBase>;
+
+    // API Anahtarı (Canlıda çalışması için kodun içine "" arasına ekleyebilir veya Vercel'den ayarlayabilirsin)
+    // Eğer Vercel'e eklediysen boş kalsın, manuel gireceksen tırnak içine yaz.
+    const apiKey = ""; 
+
+    // Görsellerin linkleri
+    const USER_IMAGE_URL = "https://lh3.googleusercontent.com/d/1JnxSJsurqYt5xUJkoNchOTcw9DOkjr4O";
+    const LOGO_URL = "https://lh3.googleusercontent.com/d/1wJE5Y-Mv_IWA4f5rhCt3blGG-96sJ5Ez";
+
+    const fetchWithRetry = async (url, options, retries = 2) => {
+      let delay = 1000;
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData?.error?.message || `Durum: ${response.status}`);
+          }
+          return await response.json();
+        } catch (error) {
+          if (i === retries - 1) throw error;
+          await new Promise(res => setTimeout(res, delay));
+          delay *= 2;
+        }
+      }
+    };
+
+    const animals = [
+      { id: 1, name: 'Köpek', emoji: '🐶', prompt: 'cute dog, very happy' },
+      { id: 2, name: 'Kedi', emoji: '🐱', prompt: 'cute cat' },
+      { id: 3, name: 'Ejderha', emoji: '🐉', prompt: 'friendly magical dragon' },
+      { id: 4, name: 'Tavşan', emoji: '🐰', prompt: 'fluffy bunny' },
+      { id: 5, name: 'Kuş', emoji: '🐦', prompt: 'colorful tropical bird' },
+      { id: 6, name: 'Kelebek', emoji: '🦋', prompt: 'glowing magical butterfly' },
+      { id: 7, name: 'Tek Boynuz', emoji: '🦄', prompt: 'sparkling white unicorn' },
+      { id: 8, name: 'Panda', emoji: '🐼', prompt: 'cute panda eating bamboo' },
+      { id: 9, name: 'Aslan', emoji: '🦁', prompt: 'brave little lion' },
+      { id: 10, name: 'Zürafa', emoji: '🦒', prompt: 'long neck giraffe' },
+      { id: 11, name: 'Fil', emoji: '🐘', prompt: 'baby elephant with big ears' },
+      { id: 12, name: 'Kaplan', emoji: '🐯', prompt: 'playful tiger cub' },
+      { id: 13, name: 'Ayı', emoji: '🐻', prompt: 'cuddly brown bear' },
+      { id: 14, name: 'Kurbağa', emoji: '🐸', prompt: 'happy little frog' },
+      { id: 15, name: 'Maymun', emoji: '🐵', prompt: 'cheeky little monkey' },
+      { id: 16, name: 'Penguen', emoji: '🐧', prompt: 'cute baby penguin' },
+      { id: 17, name: 'Zebra', emoji: '🦓', prompt: 'smiling zebra' },
+      { id: 18, name: 'At', emoji: '🐴', prompt: 'beautiful pony' },
+      { id: 19, name: 'İnek', emoji: '🐮', prompt: 'happy baby cow' },
+      { id: 20, name: 'Domuz', emoji: '🐷', prompt: 'cute pink piglet' },
+      { id: 21, name: 'Koyun', emoji: '🐑', prompt: 'fluffy white sheep' },
+      { id: 22, name: 'Keçi', emoji: '🐐', prompt: 'funny little goat' },
+      { id: 23, name: 'Geyik', emoji: '🦌', prompt: 'sweet baby deer' },
+      { id: 24, name: 'Kurt', emoji: '🐺', prompt: 'friendly wolf pup' },
+      { id: 25, name: 'Yarasa', emoji: '🦇', prompt: 'cute fruit bat' },
+      { id: 26, name: 'Arı', emoji: '🐝', prompt: 'happy buzzing bee' },
+      { id: 27, name: 'Uğur Böceği', emoji: '🐞', prompt: 'lucky ladybug' }
+    ];
+
+    const DrawingApp = ({ onGoHome }) => {
+      const canvasRef = useRef(null);
+      const contextRef = useRef(null);
+      const isDrawingRef = useRef(false);
+
+      const [tool, setTool] = useState('pencil'); 
+      const [color, setColor] = useState('#8b5cf6');
+      const [lineWidth, setLineWidth] = useState(8);
+      const [history, setHistory] = useState([]);
+      const [generationProgress, setGenerationProgress] = useState(0);
+      const [errorMessage, setErrorMessage] = useState(null);
+      const [magicState, setMagicState] = useState('idle');
+      const [selectedAnimal, setSelectedAnimal] = useState(animals[0]);
+
+      const colors = ['#000000', '#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e', '#ffffff'];
+
+      const executeMagicTouch = async () => {
+        if (magicState !== 'idle') return;
+        
+        // API KEY KONTROLÜ
+        if (!apiKey) {
+           setErrorMessage("Sihir için API anahtarı eksik! Kodu güncelleyip apiKey kısmını doldurun.");
+           return;
+        }
+
+        setMagicState('generating');
+        setGenerationProgress(10);
+        setErrorMessage(null);
+        const canvas = canvasRef.current;
+
+        try {
+          const offscreen = document.createElement('canvas');
+          offscreen.width = canvas.width;
+          offscreen.height = canvas.height;
+          const oCtx = offscreen.getContext('2d');
+          oCtx.fillStyle = 'white';
+          oCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+          oCtx.drawImage(canvas, 0, 0);
+          const base64Data = offscreen.toDataURL('image/png').split(',')[1];
+
+          setGenerationProgress(40);
+
+          const promptText = `Transform this children's sketch into an ultra-cute, magical 3D ${selectedAnimal.prompt} character. Add magical features like a glowing aura or magical sparkles. The animal must be smiling happily and looking very friendly. The animal should look like it is coming alive and moving. Setting: A magical fantasy garden. Style: High-quality 3D animated movie style (like Pixar), plushy texture, giant sparkling expressive eyes. Visual: Vibrant beautiful colors, magical sparkling lights, soft dramatic lighting. Background: Solid white (#FFFFFF).`;
+
+          const editData = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: promptText },
+                  { inlineData: { mimeType: "image/png", data: base64Data } }
+                ]
+              }],
+              generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+            })
+          });
+
+          setGenerationProgress(85);
+          const resultBase64 = editData.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+
+          if (resultBase64) {
+            const imgUrl = `data:image/png;base64,${resultBase64}`;
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+              const ctx = contextRef.current;
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+              const x = (canvas.width / 2) - (img.width / 2) * scale;
+              const y = (canvas.height / 2) - (img.height / 2) * scale;
+              ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+              saveToHistory();
+              setGenerationProgress(100);
+              setTimeout(() => { setMagicState('idle'); setGenerationProgress(0); }, 800);
+            };
+            img.src = imgUrl;
+          } else {
+            throw new Error("Resim oluşturulamadı.");
+          }
+        } catch (e) {
+          console.error("Sihir hatası:", e);
+          setMagicState('idle');
+          setGenerationProgress(0);
+          setErrorMessage(`Google Hatası: ${e.message}`);
+        }
+      };
+
+      const saveToHistory = useCallback(() => {
+        if (!contextRef.current || !canvasRef.current) return;
+        const imageData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+        setHistory(prev => [...prev, imageData].slice(-25));
+      }, []);
+
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        const initCanvas = () => {
+          const parent = canvas.parentElement;
+          const rect = parent.getBoundingClientRect();
+          canvas.width = rect.width;
+          canvas.height = rect.height;
+          
+          const context = canvas.getContext('2d', { willReadFrequently: true });
+          context.lineCap = 'round';
+          context.lineJoin = 'round';
+          context.fillStyle = 'white';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          contextRef.current = context;
+          saveToHistory();
+        };
+
+        setTimeout(initCanvas, 100);
+      }, [saveToHistory]);
+
+      const handleStart = (e) => {
+        e.preventDefault(); // Mobilde kaymayı önler
+        if (magicState === 'done') setMagicState('idle');
+        const rect = canvasRef.current.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+        
+        isDrawingRef.current = true;
+        contextRef.current.beginPath();
+        contextRef.current.moveTo(x, y);
+        contextRef.current.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
+        contextRef.current.lineWidth = tool === 'eraser' ? 40 : lineWidth;
+        contextRef.current.stroke();
+      };
+
+      const handleMove = (e) => {
+        e.preventDefault(); // Mobilde kaymayı önler
+        if (!isDrawingRef.current) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+        contextRef.current.lineTo(x, y);
+        contextRef.current.stroke();
+      };
+
+      const handleEnd = () => {
+        if (isDrawingRef.current) {
+          contextRef.current.closePath();
+          isDrawingRef.current = false;
+          saveToHistory();
+        }
+      };
+
+      const undo = () => {
+        if (history.length <= 1) return;
+        const newHistory = [...history];
+        newHistory.pop();
+        contextRef.current.putImageData(newHistory[newHistory.length - 1], 0, 0);
+        setHistory(newHistory);
+      };
+
+      const clearCanvas = () => {
+        const canvas = canvasRef.current;
+        const context = contextRef.current;
+        if (context && canvas) {
+          context.fillStyle = 'white';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          saveToHistory();
+        }
+      };
+
+      return (
+        <div className="fixed inset-0 flex flex-col bg-[#f3f0ff] font-sans select-none overflow-hidden">
+          <nav className="h-14 md:h-16 bg-white border-b-2 border-purple-200 px-3 md:px-6 flex items-center justify-between shadow-sm z-50">
+            <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={onGoHome}>
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg overflow-hidden border-2 border-purple-300">
+                <img src={USER_IMAGE_URL} alt="Robot" className="w-full h-full object-cover" />
+              </div>
+              <h1 className="text-sm md:text-lg font-black text-purple-900 tracking-tight hidden sm:block">SİHİRLİ ÇİZGİLER</h1>
+            </div>
+
+            <div className="flex items-center gap-2 md:gap-3">
+              <NavBtn onClick={onGoHome} icon={<HomeIcon size={16} />} label="Giriş" />
+              <NavBtn onClick={executeMagicTouch} icon={magicState === 'generating' ? <div className="animate-spin">✨</div> : <Wand2 size={16} />} label="Sihir" variant="magic" />
+              <NavBtn onClick={undo} icon={<Undo2 size={16} />} label="Geri" />
+              <NavBtn onClick={clearCanvas} icon={<Trash2 size={16} />} label="Sil" variant="danger" />
+              
+              <div className="hidden md:flex ml-2 border-l-2 border-purple-200 pl-4 h-10 w-28 items-center justify-center">
+                <img src={LOGO_URL} alt="Logo" className="max-h-full max-w-full object-contain" />
+              </div>
+            </div>
+          </nav>
+
+          <div className="bg-white/50 py-2 px-2 border-b border-purple-100 flex items-center justify-center gap-2 overflow-x-auto">
+            <div className="flex gap-1 bg-purple-100 p-1 rounded-xl">
+              <ToolBtn active={tool === 'pencil'} onClick={() => setTool('pencil')} icon={<Pencil size={18} />} />
+              <ToolBtn active={tool === 'brush'} onClick={() => setTool('brush')} icon={<Brush size={18} />} />
+              <ToolBtn active={tool === 'eraser'} onClick={() => setTool('eraser')} icon={<Eraser size={18} />} />
+            </div>
+            <div className="flex gap-1 flex-wrap justify-center max-w-[200px] md:max-w-none">
+              {colors.map(c => (
+                <button key={c} onClick={() => setColor(c)} className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 border-white shadow-sm ${color === c ? 'scale-110 ring-2 ring-purple-400' : ''}`} style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row flex-1 p-2 md:p-4 gap-2 md:gap-4 overflow-hidden relative">
+            
+            <aside className="h-24 md:h-auto md:w-48 bg-white/80 rounded-2xl border-2 border-purple-100 flex flex-col shadow-lg z-10 shrink-0">
+              <div className="bg-purple-600 text-white p-1 md:p-2 text-center rounded-t-xl font-bold text-xs">HAYVAN SEÇ</div>
+              <div className="flex-1 overflow-x-auto overflow-y-hidden md:overflow-y-auto md:overflow-x-hidden p-2 flex md:grid md:grid-cols-2 gap-2">
+                {animals.map(animal => (
+                  <button key={animal.id} onClick={() => setSelectedAnimal(animal)} className={`flex flex-col items-center justify-center min-w-[60px] md:min-w-0 p-1 rounded-xl border-2 transition-all ${selectedAnimal.id === animal.id ? 'bg-purple-100 border-purple-500' : 'bg-white border-transparent hover:bg-purple-50'}`}>
+                    <span className="text-2xl md:text-3xl">{animal.emoji}</span>
+                    <span className="text-[9px] font-bold text-purple-700 mt-1 truncate w-full text-center">{animal.name.toLocaleUpperCase('tr-TR')}</span>
+                  </button>
+                ))}
+              </div>
+            </aside>
+
+            <main className="flex-1 bg-white rounded-2xl md:rounded-3xl shadow-xl border-4 border-white relative overflow-hidden min-h-[200px]">
+              <canvas ref={canvasRef} onMouseDown={handleStart} onMouseMove={handleMove} onMouseUp={handleEnd} onMouseOut={handleEnd} onTouchStart={handleStart} onTouchMove={handleMove} onTouchEnd={handleEnd} onTouchCancel={handleEnd} className="w-full h-full cursor-crosshair touch-none" style={{touchAction: 'none'}} />
+              
+              {magicState === 'generating' && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-[60] animate-pulse">
+                  <div className="bg-gradient-to-b from-purple-100 to-white border-4 border-purple-300 rounded-[2rem] p-6 text-center shadow-2xl relative">
+                    <div className="text-6xl animate-bounce mb-4">{selectedAnimal.emoji}</div>
+                    <h3 className="text-xl font-black text-purple-800 mb-2">Sihir Gerçekleşiyor!</h3>
+                    <div className="w-full h-3 bg-purple-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-500" style={{ width: `${generationProgress}%` }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
+
+            {errorMessage && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-white rounded-xl shadow-xl border-2 border-red-100 p-3 flex items-center gap-2 w-11/12 max-w-sm">
+                <AlertCircle size={20} className="text-red-500 shrink-0" />
+                <span className="font-bold text-xs text-slate-700">{errorMessage}</span>
+                <button onClick={() => setErrorMessage(null)} className="ml-auto text-red-500 font-black text-xs px-2 py-1 bg-red-50 rounded-lg hover:bg-red-100">X</button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const App = () => {
+      const [view, setView] = useState('home');
+
+      if (view === 'home') {
+        return (
+          <div className="fixed inset-0 flex flex-col font-sans select-none overflow-hidden bg-[#0f0a2a]">
+            <div className="absolute top-4 right-4 md:top-8 md:right-12 z-50">
+              <div className="h-10 md:h-16 bg-white rounded-xl shadow-lg border-2 border-purple-200 flex items-center justify-center p-2">
+                <img src={LOGO_URL} alt="Logo" className="h-full object-contain" />
+              </div>
+            </div>
+
+            <div className="absolute inset-0">
+              <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-900/40 rounded-full blur-[80px] md:blur-[120px] animate-pulse"></div>
+              <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-900/40 rounded-full blur-[80px] md:blur-[120px] animate-pulse delay-1000"></div>
+            </div>
+
+            <main className="flex-1 flex flex-col items-center justify-center relative z-10 p-4 w-full gap-6">
+              <div className="text-center z-20 mt-12 md:mt-0">
+                <h1 className="text-4xl md:text-7xl font-black text-white mb-2 tracking-tighter drop-shadow-lg">
+                  SİHİRLİ <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-purple-400">ÇİZGİLER</span>
+                </h1>
+              </div>
+
+              <div className="flex justify-center w-full">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-fuchsia-600 via-purple-600 to-indigo-600 rounded-[2rem] blur-[30px] opacity-50 scale-110"></div>
+                  <div className="w-[200px] h-[200px] md:w-[400px] md:h-[400px] rounded-[2rem] relative z-10 shadow-2xl border-[6px] md:border-[12px] border-white/10 overflow-hidden bg-transparent">
+                    <img src={USER_IMAGE_URL} alt="Robot" className="w-full h-full object-contain" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center z-20 flex flex-col items-center mt-4">
+                <p className="text-sm md:text-xl font-bold text-purple-200/90 mb-4 max-w-sm px-2">
+                  Çizgilerin canlandığı, hayallerin gerçeğe dönüştüğü sihirli bahçeye hoş geldin!
+                </p>
+                <button onClick={() => setView('drawing')} className="bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white text-lg md:text-2xl font-black py-3 px-8 rounded-full shadow-2xl hover:scale-105 transition-transform flex items-center gap-2 group border-2 border-white/20">
+                  <Sparkles className="group-hover:rotate-12 transition-transform text-yellow-300" size={24} /> Çizime Başla
+                </button>
+              </div>
+            </main>
+          </div>
+        );
+      }
+
+      return <DrawingApp onGoHome={() => setView('home')} />;
+    };
+
+    const NavBtn = ({ onClick, icon, label, variant }) => {
+      const styles = {
+        magic: "bg-purple-600 text-white",
+        danger: "bg-red-50 text-red-500",
+        default: "bg-purple-50 text-purple-700"
+      };
+      return (
+        <button onClick={onClick} className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl font-bold text-[10px] md:text-xs transition-all active:scale-95 ${styles[variant || 'default']}`}>
+          {icon} <span className="hidden sm:inline">{label.toLocaleUpperCase('tr-TR')}</span>
+        </button>
+      );
+    };
+
+    const ToolBtn = ({ active, onClick, icon }) => (
+      <button onClick={onClick} className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-all ${active ? 'bg-purple-600 text-white shadow-md' : 'text-purple-400 hover:bg-purple-200'}`}>
+        {icon}
+      </button>
+    );
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
